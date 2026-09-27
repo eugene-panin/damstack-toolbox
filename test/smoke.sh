@@ -4,7 +4,7 @@ set -euo pipefail
 image=${1:?usage: smoke.sh <image>}
 work=$(mktemp -d)
 trap 'rm -rf "$work"' EXIT
-uid=12345:12345
+uid="$(id -u):$(id -g)"
 run() { docker run --rm --user "$uid" -v "$work:/work" "$image" "$@"; }
 step() { printf '\n== %s\n' "$*"; }
 
@@ -21,7 +21,9 @@ docker run --rm "$image" sh -c 'for tool in make restic go jq kubectl helm boile
   if command -v "$tool" >/dev/null; then echo "$tool is in the image" >&2; exit 1; fi
 done'
 
-step "any user: a passwd entry for ssh, a writable home"
+step "the user who owns the project, unknown to the image: a passwd entry for ssh, a writable home"
+docker run --rm --user 4242:4242 --entrypoint sh "$image" -c 'ssh -G example.org >/dev/null 2>&1' \
+  && { echo "ssh ran for a user missing from /etc/passwd; the check below would prove nothing" >&2; exit 1; }
 run sh -c 'whoami && ssh -G example.org | grep -qx "user damstack" && touch "$HOME/probe"'
 
 step "ansible runs as that user"
