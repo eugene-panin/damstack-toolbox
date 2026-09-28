@@ -29,16 +29,32 @@ run sh -c 'whoami && ssh -G example.org | grep -qx "user damstack" && touch "$HO
 step "ansible runs as that user"
 run ansible localhost -c local -m ansible.builtin.ping | grep -q '"ping": "pong"'
 
-step "tofu fetches a module from the registry over git, and its provider"
-mkdir -p "$work/tofu"
-cat >"$work/tofu/main.tf" <<'TF'
+step "tofu fetches a module from the registry, over git"
+mkdir -p "$work/module"
+cat >"$work/module/main.tf" <<'TF'
 module "dns" {
   source  = "eugene-panin/hashistack/nomad//modules/dns-cloudflare"
   version = "~> 0.7"
-  records = [{ "example.org" = [{ type = "A", name = "example.org", content = "192.0.2.1" }] }]
+  records = []
 }
 TF
-docker run --rm --user "$uid" -v "$work:/work" -w /work/tofu "$image" sh -c 'tofu init -input=false -no-color >/dev/null && tofu validate -no-color'
+docker run --rm --user "$uid" -v "$work:/work" -w /work/module "$image" tofu get -no-color >/dev/null
+test -f "$work/module/.terraform/modules/dns/modules/dns-cloudflare/main.tf"
+
+step "tofu installs a provider and validates"
+mkdir -p "$work/provider"
+cat >"$work/provider/main.tf" <<'TF'
+terraform {
+  required_providers {
+    random = { source = "hashicorp/random", version = "~> 3.7" }
+  }
+}
+
+resource "random_id" "probe" {
+  byte_length = 4
+}
+TF
+docker run --rm --user "$uid" -v "$work:/work" -w /work/provider "$image" sh -c 'tofu init -input=false -no-color >/dev/null && tofu validate -no-color'
 
 step "conftest verifies a policy"
 mkdir -p "$work/policy"
