@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Proves a native toolbox archive on this machine: every tool at its pinned
+# Proves a native toolbox archive on this Mac: every tool at its pinned
 # version, nothing taken from the machine or the user, and the same after the
 # toolbox moves to another directory.
 #

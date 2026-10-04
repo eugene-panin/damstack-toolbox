@@ -1,22 +1,20 @@
 #!/usr/bin/env bash
-# Builds the native toolbox for one platform: a Python of its own with
+# Builds the native toolbox for one kind of Mac: a Python of its own with
 # ansible-core in it, OpenTofu, Conftest and restic, every download checked
-# against its SHA-256, into <out>/damstack-toolbox-<version>-<os>-<arch>.tar.gz.
-# Any platform builds on any machine; it needs curl, unzip, bzip2 and uv.
+# against its SHA-256, into <out>/damstack-toolbox-<version>-darwin-<arch>.tar.gz.
+# It builds on any machine, Linux too; it needs curl, unzip, bzip2 and uv.
 set -euo pipefail
 
-usage() { echo "usage: build.sh <version> <darwin|linux> <amd64|arm64> <out>" >&2; exit 2; }
-[[ $# -eq 4 ]] || usage
-version=$1 os=$2 arch=$3 out=$4
+usage() { echo "usage: build.sh <version> <arm64|amd64> <out>" >&2; exit 2; }
+[[ $# -eq 3 ]] || usage
+version=$1 arch=$2 out=$3 os=darwin
 here=$(cd "$(dirname "$0")" && pwd)
 # shellcheck source-path=SCRIPTDIR source=versions.env
 . "$here/versions.env"
 
-case "$os-$arch" in
-  darwin-arm64) triple=aarch64-apple-darwin conftest_platform=Darwin_arm64 ;;
-  darwin-amd64) triple=x86_64-apple-darwin conftest_platform=Darwin_x86_64 ;;
-  linux-arm64) triple=aarch64-unknown-linux-gnu conftest_platform=Linux_arm64 ;;
-  linux-amd64) triple=x86_64-unknown-linux-gnu conftest_platform=Linux_x86_64 ;;
+case "$arch" in
+  arm64) triple=aarch64-apple-darwin conftest_platform=Darwin_arm64 ;;
+  amd64) triple=x86_64-apple-darwin conftest_platform=Darwin_x86_64 ;;
   *) usage ;;
 esac
 key=$(echo "${os}_${arch}" | tr '[:lower:]' '[:upper:]')
@@ -49,7 +47,7 @@ minor=${PYTHON_VERSION%.*}
 site="$root/python/lib/python$minor/site-packages"
 uv pip install --quiet --target "$site" --python-platform "$triple" --python-version "$minor" \
   --only-binary :all: --require-hashes --no-deps -r "$here/requirements.lock"
-rm -rf "$site"/pip "$site"/pip-*.dist-info "$root"/python/bin/pip*
+rm -rf "$site"/pip "$site"/pip-*.dist-info "$site"/ansible_test "$root"/python/bin/pip*
 find "$root/python" -name __pycache__ -type d -prune -exec rm -rf {} +
 
 tofu=$(fetch "https://github.com/opentofu/opentofu/releases/download/v$TOFU_VERSION/tofu_${TOFU_VERSION}_${os}_${arch}.zip" "$(sum TOFU)")

@@ -19,9 +19,9 @@ this one.
 
 ## The native toolbox
 
-The same tools, and restic, without Docker: one archive per platform,
-`damstack-toolbox-<version>-<darwin|linux>-<amd64|arm64>.tar.gz`, with
-`SHA256SUMS`, in the release of every tag. damstack fetches the one of its
+The same tools, and restic, without Docker, for the Mac damstack runs on:
+`damstack-toolbox-<version>-darwin-<arm64|amd64>.tar.gz`, with `SHA256SUMS`,
+in the release of every tag. damstack fetches the one of its
 machine into its cache, checks it, and runs every step with it.
 
 ```
@@ -31,12 +31,11 @@ etc/        tofurc and an empty ansible.cfg, the configurations of the toolbox
 VERSION     the version of everything in it
 ```
 
-[`native/build.sh`](native/build.sh) builds any platform on any machine: every
+[`native/build.sh`](native/build.sh) builds either on any machine: every
 download is checked against its SHA-256 in
 [`native/versions.env`](native/versions.env), and the Python packages are
 installed from wheels by the hashes of
-[`native/requirements.lock`](native/requirements.lock). On Linux it needs
-glibc 2.17 or newer; Alpine is not supported natively.
+[`native/requirements.lock`](native/requirements.lock).
 
 It takes nothing from the machine but `git`, which OpenTofu fetches modules
 with, and `ssh`. Two things keep it apart from the user's own tools:
@@ -51,8 +50,8 @@ with, and `ssh`. Two things keep it apart from the user's own tools:
   installs providers from their registries only, never from the plugin
   directories of the user.
 
-cryptography builds for Intel Macs up to 48.0.1; that platform has it, the
-others the latest.
+cryptography builds for Intel Macs up to 48.0.1; they have it, Apple silicon
+the latest.
 
 ## Running as any user
 
@@ -76,8 +75,8 @@ checks that:
 - Ansible runs; OpenTofu fetches a module from the registry over git and its
   provider, and validates; Conftest verifies a policy with its tests.
 
-[`test/native.sh`](test/native.sh), in CI on Linux amd64 and arm64 and on
-macOS arm64, and amd64 under Rosetta, poisons the machine first: commands of
+[`test/native.sh`](test/native.sh), in CI on macOS, the amd64 archive under
+Rosetta, poisons the machine first: commands of
 the same names on the `PATH`, a Python path, home and user site that break
 any import of Ansible, an `ansible.cfg` and a `.terraformrc` of the user that
 break any run, a provider in the user's plugin directory, `TF_VAR_*`. Then it

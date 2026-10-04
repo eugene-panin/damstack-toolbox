@@ -61,12 +61,12 @@ jobs:
       - name: shellcheck
         run: shellcheck -x native/build.sh test/native.sh
 
-      - name: Build every platform
+      - name: Build for both kinds of Mac
         run: |
           version=0.0.0-${GITHUB_SHA::7}
           if [[ $GITHUB_REF == refs/tags/v* ]]; then version=${GITHUB_REF_NAME#v}; fi
-          for platform in darwin-arm64 darwin-amd64 linux-arm64 linux-amd64; do
-            native/build.sh "$version" "${platform%-*}" "${platform#*-}" dist
+          for arch in arm64 amd64; do
+            native/build.sh "$version" "$arch" dist
           done
           (cd dist && sha256sum ./*.tar.gz | sed 's| \./| |' >SHA256SUMS)
 
@@ -76,21 +76,13 @@ jobs:
           path: dist/
 
   native-test:
-    name: native test (${{ matrix.platform }})
+    name: native test (darwin-${{ matrix.arch }})
     needs: native-build
     strategy:
       fail-fast: false
       matrix:
-        include:
-          - platform: linux-amd64
-            runner: ubuntu-24.04
-          - platform: linux-arm64
-            runner: ubuntu-24.04-arm
-          - platform: darwin-arm64
-            runner: macos-15
-          - platform: darwin-amd64
-            runner: macos-15
-    runs-on: ${{ matrix.runner }}
+        arch: [arm64, amd64]
+    runs-on: macos-15
     steps:
       - uses: actions/checkout@v7
 
@@ -100,7 +92,7 @@ jobs:
           path: dist/
 
       - name: Isolation and relocation test
-        run: test/native.sh dist/damstack-toolbox-*-${{ matrix.platform }}.tar.gz </dev/null
+        run: test/native.sh dist/damstack-toolbox-*-darwin-${{ matrix.arch }}.tar.gz </dev/null
 
   native-release:
     name: native release
@@ -118,7 +110,7 @@ jobs:
       - name: Release the archives
         env:
           GH_TOKEN: ${{ github.token }}
-        run: gh release create "$GITHUB_REF_NAME" dist/* --repo "$GITHUB_REPOSITORY" --title "$GITHUB_REF_NAME" --notes "The native toolbox for darwin and linux, amd64 and arm64, with SHA256SUMS."
+        run: gh release create "$GITHUB_REF_NAME" dist/* --repo "$GITHUB_REPOSITORY" --title "$GITHUB_REF_NAME" --notes "The native toolbox for Macs, arm64 and amd64 (under Rosetta too), with SHA256SUMS."
 
   publish:
     name: publish
