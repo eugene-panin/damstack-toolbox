@@ -14,9 +14,45 @@ of a stack with, and nothing more:
 On Alpine 3.24, about 290 MB, for amd64 and arm64. OpenTofu and Conftest are
 checked against their SHA-256 when the image is built.
 
-What is not here, on purpose: the tools of the laptop side, such as restic,
-come as binaries damstack fetches itself; anything only one stack needs goes
-into an image of that stack, built `FROM` this one.
+Anything only one stack needs goes into an image of that stack, built `FROM`
+this one.
+
+## The native toolbox
+
+The same tools, and restic, without Docker: one archive per platform,
+`damstack-toolbox-<version>-<darwin|linux>-<amd64|arm64>.tar.gz`, with
+`SHA256SUMS`, in the release of every tag. damstack fetches the one of its
+machine into its cache, checks it, and runs every step with it.
+
+```
+bin/        tofu, conftest, restic, and ansible-* run on the Python below
+python/     Python 3.13 of python-build-standalone, with ansible-core in it
+etc/        tofurc and an empty ansible.cfg, the configurations of the toolbox
+VERSION     the version of everything in it
+```
+
+[`native/build.sh`](native/build.sh) builds any platform on any machine: every
+download is checked against its SHA-256 in
+[`native/versions.env`](native/versions.env), and the Python packages are
+installed from wheels by the hashes of
+[`native/requirements.lock`](native/requirements.lock). On Linux it needs
+glibc 2.17 or newer; Alpine is not supported natively.
+
+It takes nothing from the machine but `git`, which OpenTofu fetches modules
+with, and `ssh`. Two things keep it apart from the user's own tools:
+
+- `ansible-*` run their Python with `-I`: it ignores `PYTHONPATH`,
+  `PYTHONHOME` and every other `PYTHON*` variable, and the user's site
+  packages.
+- damstack gives every step an environment of its own, not the user's
+  shell: `HOME`, `PATH` with `bin/` of the toolbox first, `TMPDIR`, and
+  `ANSIBLE_CONFIG` (the stack's, or `etc/ansible.cfg`), `ANSIBLE_HOME`,
+  `TF_CLI_CONFIG_FILE=etc/tofurc` and `TF_PLUGIN_CACHE_DIR`. `etc/tofurc`
+  installs providers from their registries only, never from the plugin
+  directories of the user.
+
+cryptography builds for Intel Macs up to 48.0.1; that platform has it, the
+others the latest.
 
 ## Running as any user
 
@@ -39,6 +75,21 @@ checks that:
   writable;
 - Ansible runs; OpenTofu fetches a module from the registry over git and its
   provider, and validates; Conftest verifies a policy with its tests.
+
+[`test/native.sh`](test/native.sh), in CI on Linux amd64 and arm64 and on
+macOS arm64, and amd64 under Rosetta, poisons the machine first: commands of
+the same names on the `PATH`, a Python path, home and user site that break
+any import of Ansible, an `ansible.cfg` and a `.terraformrc` of the user that
+break any run, a provider in the user's plugin directory, `TF_VAR_*`. Then it
+checks, each with a control that must fail in the user's environment, that:
+
+- every tool is at its pinned version, and Ansible runs on the Python of the
+  toolbox, its modules too;
+- Ansible Vault encrypts and decrypts, and a playbook runs;
+- OpenTofu fetches a module over git and its provider from the registry, and
+  no variable of the user reaches it;
+- Conftest verifies a policy, restic backs up and restores;
+- all of it works the same after the toolbox moves to another directory.
 
 Tags `vX.Y.Z` publish `ghcr.io/eugene-panin/damstack-toolbox:X.Y.Z`, `:X.Y`
 and `:latest`.
